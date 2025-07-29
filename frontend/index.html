@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Secure Auth Portal</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background-color: #f5f7fa;
+      padding: 30px;
+      max-width: 500px;
+      margin: auto;
+      border-radius: 10px;
+      box-shadow: 0 0 15px rgba(0,0,0,0.1);
+      text-align: center;
+    }
+    h1 {
+      margin-bottom: 20px;
+      color: #007bff;
+    }
+    button {
+      padding: 10px 20px;
+      margin: 10px;
+      font-size: 1rem;
+      border-radius: 5px;
+      border: none;
+      background-color: #007bff;
+      color: white;
+      cursor: pointer;
+    }
+    button:hover {
+      background-color: #0056b3;
+    }
+    input {
+      padding: 10px;
+      margin: 8px 0;
+      width: 80%;
+      font-size: 1rem;
+      border-radius: 5px;
+      border: 1px solid #ccc;
+    }
+    .form-section {
+      margin-top: 20px;
+      display: none;
+    }
+    .active {
+      display: block;
+    }
+    .message {
+      margin-top: 20px;
+      padding: 10px;
+      background: #e1f3d8;
+      color: #2f7e2f;
+      border-radius: 5px;
+      white-space: pre-wrap;
+    }
+    .error {
+      background: #f8d7da;
+      color: #721c24;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>Secure User Auth</h1>
+
+  <button onclick="toggleForm('login')">Login</button>
+  <button onclick="toggleForm('register')">Register</button>
+  <button onclick="checkAdmin()">Check Admin</button>
+  <button onclick="logout()">Logout</button>
+
+  <div id="login-form" class="form-section">
+    <h2>Login</h2>
+    <input type="email" id="login-email" placeholder="Email">
+    <input type="password" id="login-password" placeholder="Password">
+    <button onclick="login()">Submit</button>
+  </div>
+
+  <div id="register-form" class="form-section">
+    <h2>Register</h2>
+    <input type="text" id="reg-name" placeholder="Username">
+    <input type="email" id="reg-email" placeholder="Email">
+    <input type="password" id="reg-password" placeholder="Password">
+    <button onclick="register()">Submit</button>
+  </div>
+
+  <p id="response" class="message"></p>
+
+  <script>
+    let token = localStorage.getItem('authToken') || "";
+
+    function showMessage(msg, isError = false) {
+      const response = document.getElementById('response');
+      response.className = isError ? 'message error' : 'message';
+      response.innerText = msg;
+    }
+
+    function toggleForm(type) {
+      document.getElementById('login-form').classList.remove('active');
+      document.getElementById('register-form').classList.remove('active');
+      if (type === 'login') {
+        document.getElementById('login-form').classList.add('active');
+      } else if (type === 'register') {
+        document.getElementById('register-form').classList.add('active');
+      }
+    }
+
+    function register() {
+      const username = document.getElementById('reg-name').value;
+      const email = document.getElementById('reg-email').value;
+      const password = document.getElementById('reg-password').value;
+
+      fetch('http://localhost:5000/api/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, email, password })
+      })
+      .then(res => res.json())
+      .then(data => {
+        showMessage(data.msg || "Registration completed", data.error);
+      })
+      .catch(err => showMessage('Registration failed', true));
+    }
+
+    function login() {
+      const email = document.getElementById('login-email').value;
+      const password = document.getElementById('login-password').value;
+
+      fetch('http://localhost:5000/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password })
+      })
+      .then(res => res.json())
+      .then(data => {
+        if (data.token && data.user) {
+          token = data.token;
+          localStorage.setItem('authToken', token);
+          showMessage(`Welcome, ${data.user.name}`);
+        } else {
+          showMessage(JSON.stringify(data, null, 2), true);
+        }
+      })
+      .catch(err => showMessage('Login failed', true));
+    }
+
+    function checkAdmin() {
+  if (!token) return showMessage("Please login first!", true);
+
+  fetch("http://localhost:5000/api/auth/admin", {
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json"
+    }
+  })
+    .then(res => {
+      if (!res.ok) {
+        throw new Error("Access denied");
+      }
+      return res.json();
+    })
+    .then(data => {
+      if (data.error) {
+        showMessage(data.error, true);
+      } else {
+        showMessage("✅ Access granted. Welcome Admin!", false);
+        // Optionally, load admin dashboard here
+        // loadAdminDashboard(data); 
+      }
+    })
+    .catch(err => {
+      console.error("Admin check error:", err);
+      showMessage("❌ Admin check failed. " + err.message, true);
+    });
+}
+
+    function logout() {
+      token = "";
+      localStorage.removeItem('authToken');
+      showMessage('You have been logged out.');
+    }
+  </script>
+
+</body>
+</html>
